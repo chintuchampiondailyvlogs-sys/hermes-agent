@@ -8,20 +8,18 @@ if command -v aws &> /dev/null; then
     echo "[+] AWS CLI v2 is available."
 fi
 
-# 2. Start Hermes Agent background service safely
-echo "[+] Starting Hermes Agent..."
+# 2. Start Hermes Gateway background service (Valid CLI choice)
+echo "[+] Starting Hermes Gateway..."
 if command -v hermes &> /dev/null; then
-    hermes start &
-elif command -v hermes-agent &> /dev/null; then
-    hermes-agent &
+    hermes gateway &
 else
-    echo "[!] Hermes CLI entrypoint not found in PATH, skipping..."
+    echo "[!] Hermes CLI not found in PATH, skipping..."
 fi
 
-# 3. Target port (Render defaults to 10000 via $PORT)
+# 3. Target port expected by Render
 LISTEN_PORT="${PORT:-10000}"
 
 echo "[+] Starting OmniRoute AI Gateway on port ${LISTEN_PORT}..."
 
-# Exec without invalid '--host' option
+# Exec ensures OmniRoute runs in foreground as PID 1
 exec omniroute --port "${LISTEN_PORT}"
