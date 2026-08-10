@@ -3,38 +3,54 @@ set -e
 
 echo "=== Starting Hermes & OmniRoute Multi-Container Stack ==="
 
-# 1. Download & Install AWS CLI for Cloudflare R2 syncing
-apt-get update && apt-get install -y awscli curl unzip python3-pip npm nodejs
+# -------------------------------------------------------------------
+# 1. Environment & Default Configuration
+# -------------------------------------------------------------------
+# Default to port 7860 if PORT is not set by Render/Hosting provider
+PORT="${PORT:-7860}"
 
-# 2. Configure AWS CLI for Cloudflare R2
-aws configure set aws_access_key_id "$R2_ACCESS_KEY"
-aws configure set aws_secret_access_key "$R2_SECRET_KEY"
-aws configure set default.region us-east-1
+# Optional Cloudflare R2 / AWS CLI Sync Check
+if command -v aws >/dev/null 2>&1; then
+    echo "[+] AWS CLI v2 is available:"
+    aws --version
+    
+    # Optional: Put your R2 sync command here if needed:
+    # if [ -n "$R2_BUCKET_NAME" ]; then
+    #     echo "[+] Syncing state from Cloudflare R2..."
+    #     aws s3 sync "s3://${R2_BUCKET_NAME}/data" /app/data --endpoint-url "$R2_ENDPOINT_URL"
+    # fi
+else
+    echo "[!] Warning: AWS CLI not found, skipping storage sync."
+fi
 
-# 3. Pull Hermes Agent Memory from Cloudflare R2 onto startup
-mkdir -p /root/.hermes
-echo "=== Pulling Hermes memory from R2 Storage ==="
-aws s3 sync "s3://$R2_BUCKET/hermes-memory" /root/.hermes/ --endpoint-url "$R2_ENDPOINT" || echo "First boot: No existing memory found in bucket."
+# -------------------------------------------------------------------
+# 2. Start OmniRoute Gateway (Background)
+# -------------------------------------------------------------------
+echo "[+] Starting OmniRoute AI Gateway on port ${PORT}..."
 
-# 4. Background Sync Task (Syncs Hermes memory back to Cloudflare R2 every 10 mins)
-(
-  while true; do
-    sleep 600
-    echo "=== Auto-syncing Hermes memory to Cloudflare R2 ==="
-    aws s3 sync /root/.hermes/ "s3://$R2_BUCKET/hermes-memory" --endpoint-url "$R2_ENDPOINT"
-  done
-) &
+# OmniRoute can be started via global CLI or npx
+if command -v omniroute >/dev/null 2>&1; then
+    PORT=$PORT omniroute > /app/omniroute.log 2>&1 &
+else
+    PORT=$PORT npx omniroute > /app/omniroute.log 2>&1 &
+fi
 
-# 5. Launch OmniRoute AI Gateway in background
-echo "=== Launching OmniRoute Service ==="
-npx omniroute --port 20128 &
+OMNI_PID=$!
+echo "[+] OmniRoute started with PID: ${OMNI_PID}"
 
-# Wait for OmniRoute engine to initialize
-sleep 5
+# Give OmniRoute a moment to initialize
+sleep 3
 
-# 6. Install and Start Hermes Agent with Telegram Gateway
-echo "=== Launching Hermes Agent Service ==="
-pip3 install hermes-agent
-
-hermes config set open_ai_base_url "http://127.0.0.1:20128/v1"
-hermes gateway telegram --token "$TELEGRAM_BOT_TOKEN" --allowed-users "$TELEGRAM_ALLOWED_USERS"
+# -------------------------------------------------------------------
+# 3. Start Hermes Agent or Main Execution Process
+# -------------------------------------------------------------------
+if command -v hermes >/dev/null 2>&1; then
+    echo "[+] Starting Hermes Agent..."
+    exec hermes gateway run
+else
+    echo "[!] Hermes executable not found in PATH."
+    echo "[+] Keeping OmniRoute active as primary process..."
+    
+    # Tail OmniRoute logs to keep the container running in the foreground
+    tail -f /app/omniroute.log
+fi
