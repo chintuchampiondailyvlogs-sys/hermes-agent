@@ -1,12 +1,8 @@
 FROM ubuntu:24.04
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
-ENV NODE_OPTIONS="--max-old-space-size=384"
-
 WORKDIR /app
 
-# 1. Update and install core system dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     unzip \
@@ -18,27 +14,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install official AWS CLI v2
+# Install AWS CLI v2
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
     && unzip awscliv2.zip \
     && ./aws/install \
     && rm -rf awscliv2.zip aws
 
-# 3. Install Node.js 22 LTS
+# Install Node.js 22.x
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# 4. Install Hermes Agent with Telegram platform support
+# Install Hermes Agent Python package
 RUN pip3 install "hermes-agent[telegram]" --break-system-packages || true
 
-# 5. Install OmniRoute globally
+# Install OmniRoute AI Gateway globally
 RUN npm install -g omniroute --legacy-peer-deps
 
-# 6. Copy entrypoint script and set permissions
+# Pre-initialize OmniRoute during build so startup doesn't delay port detection
+RUN mkdir -p /root/.omniroute && omniroute init --yes || true
+
+# Copy entrypoint execution script
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-EXPOSE 7860
+# Expose target port for Render container engine
+EXPOSE 10000
 
+# Set entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]
