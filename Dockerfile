@@ -25,21 +25,21 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Hermes Agent Python package
+# Install Hermes Agent
 RUN pip3 install "hermes-agent[telegram]" --break-system-packages || true
 
 # Install OmniRoute AI Gateway globally
 RUN npm install -g omniroute --legacy-peer-deps
 
-# Pre-initialize OmniRoute during build so startup doesn't delay port detection
+# Pre-initialize OmniRoute so startup key generation doesn't block boot
 RUN mkdir -p /root/.omniroute && omniroute init --yes || true
 
-# Copy entrypoint execution script
+# Copy entrypoint script
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Expose target port for Render container engine
+# Environment defaults for OmniRoute to listen on all interfaces
+ENV HOST=0.0.0.0
 EXPOSE 10000
 
-# Set entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]
