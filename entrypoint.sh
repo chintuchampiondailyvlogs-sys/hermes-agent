@@ -4,31 +4,30 @@ set -e
 echo "=== Starting Hermes & OmniRoute Multi-Container Stack ==="
 
 # -------------------------------------------------------------------
-# 1. Environment & Default Configuration
+# 1. Environment & Dynamic Port Handling
 # -------------------------------------------------------------------
-# Default to port 7860 if PORT is not set by Render/Hosting provider
+# Render passes dynamic PORT (e.g. 10000). Default to 7860 if local.
 PORT="${PORT:-7860}"
 
-# Optional Cloudflare R2 / AWS CLI Sync Check
+# Verify AWS CLI v2 Availability
 if command -v aws >/dev/null 2>&1; then
     echo "[+] AWS CLI v2 is available:"
     aws --version
     
-    # Optional: Put your R2 sync command here if needed:
+    # Optional Cloudflare R2 Sync (Uncomment when credentials are set)
     # if [ -n "$R2_BUCKET_NAME" ]; then
     #     echo "[+] Syncing state from Cloudflare R2..."
     #     aws s3 sync "s3://${R2_BUCKET_NAME}/data" /app/data --endpoint-url "$R2_ENDPOINT_URL"
     # fi
 else
-    echo "[!] Warning: AWS CLI not found, skipping storage sync."
+    echo "[!] Warning: AWS CLI not found."
 fi
 
 # -------------------------------------------------------------------
-# 2. Start OmniRoute Gateway (Background)
+# 2. Start OmniRoute AI Gateway in Background
 # -------------------------------------------------------------------
 echo "[+] Starting OmniRoute AI Gateway on port ${PORT}..."
 
-# OmniRoute can be started via global CLI or npx
 if command -v omniroute >/dev/null 2>&1; then
     PORT=$PORT omniroute > /app/omniroute.log 2>&1 &
 else
@@ -38,11 +37,11 @@ fi
 OMNI_PID=$!
 echo "[+] OmniRoute started with PID: ${OMNI_PID}"
 
-# Give OmniRoute a moment to initialize
+# Allow OmniRoute to initialize
 sleep 3
 
 # -------------------------------------------------------------------
-# 3. Start Hermes Agent or Main Execution Process
+# 3. Start Hermes Agent or Maintain Primary Process
 # -------------------------------------------------------------------
 if command -v hermes >/dev/null 2>&1; then
     echo "[+] Starting Hermes Agent..."
@@ -51,6 +50,6 @@ else
     echo "[!] Hermes executable not found in PATH."
     echo "[+] Keeping OmniRoute active as primary process..."
     
-    # Tail OmniRoute logs to keep the container running in the foreground
+    # Keep container alive by streaming OmniRoute logs
     tail -f /app/omniroute.log
 fi
