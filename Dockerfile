@@ -2,7 +2,6 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
-# Limit Node heap memory inside Docker build & runtime
 ENV NODE_OPTIONS="--max-old-space-size=384"
 
 WORKDIR /app
@@ -30,8 +29,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# 4. Install Hermes Agent CLI
-RUN pip3 install hermes-agent --break-system-packages || true
+# 4. Install Hermes Agent with Telegram platform support
+RUN pip3 install "hermes-agent[telegram]" --break-system-packages || true
 
 # 5. Install OmniRoute globally
 RUN npm install -g omniroute --legacy-peer-deps
