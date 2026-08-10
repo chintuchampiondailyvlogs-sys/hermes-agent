@@ -1,8 +1,9 @@
 FROM ubuntu:24.04
 
-# Prevent interactive prompts during apt installation
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
+# Limit Node heap memory inside Docker build & runtime
+ENV NODE_OPTIONS="--max-old-space-size=384"
 
 WORKDIR /app
 
@@ -18,13 +19,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install official AWS CLI v2 (Bypasses apt v1 deprecation in Ubuntu 24.04)
+# 2. Install official AWS CLI v2
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
     && unzip awscliv2.zip \
     && ./aws/install \
     && rm -rf awscliv2.zip aws
 
-# 3. Install Node.js 22 LTS & npm via NodeSource
+# 3. Install Node.js 22 LTS
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -35,11 +36,10 @@ RUN pip3 install hermes-agent --break-system-packages || true
 # 5. Install OmniRoute globally
 RUN npm install -g omniroute --legacy-peer-deps
 
-# 6. Copy entrypoint script and configure permissions
+# 6. Copy entrypoint script and set permissions
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Expose port (Render overrides this with $PORT dynamically)
 EXPOSE 7860
 
 ENTRYPOINT ["/app/entrypoint.sh"]
