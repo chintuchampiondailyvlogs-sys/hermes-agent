@@ -6,27 +6,33 @@ ENV TZ=Etc/UTC
 
 WORKDIR /app
 
-# 1. Update and install core prerequisites first
+# 1. Update and install core prerequisites & AWS CLI v2 bundle dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    unzip \
     ca-certificates \
     gnupg \
     git \
     python3 \
     python3-pip \
-    awscli \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Node.js & npm cleanly via NodeSource LTS
+# 2. Install official AWS CLI v2 (Works seamlessly on Ubuntu 24.04)
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip aws
+
+# 3. Install Node.js & npm via NodeSource LTS
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Install OmniRoute globally
+# 4. Install OmniRoute globally
 RUN npm install -g omniroute
 
-# 4. Copy entrypoint script and set permissions
+# 5. Copy entrypoint script and set permissions
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
